@@ -60,8 +60,7 @@
             <div class="flex flex-col sm:flex-row justify-between gap-4 items-center">
                 <div class="relative w-full sm:w-96">
                     <i class="ph ph-magnifying-glass absolute left-4 top-3.5 text-slate-400 text-lg"></i>
-                    <!-- ค้นหาได้ทั้งลูกค้าและโครงการ -->
-                    <input type="text" placeholder="ค้นหาชื่อลูกค้า, โครงการ..." v-model="searchQuery" class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" placeholder="ค้นหาชื่อลูกค้า, ชื่องาน..." v-model="searchQuery" class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <button @click="view = 'create'" class="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-indigo-200 hover:shadow-lg hover:-translate-y-0.5 transition-all font-bold">
                     <i class="ph ph-plus text-xl"></i> สร้างใบเสนอราคา
@@ -69,7 +68,6 @@
             </div>
 
             <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden relative">
-                <!-- โหลดแสดงตอนดึงประวัติ -->
                 <div v-if="loadingHistory" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-indigo-600">
                     <i class="ph ph-spinner-gap animate-spin text-4xl mb-2"></i>
                     <p class="font-bold">กำลังโหลดประวัติ...</p>
@@ -79,28 +77,26 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50/50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-widest font-bold">
-                                <th class="p-5">ลูกค้า / โครงการ</th> <!-- รวมคอลัมน์ -->
-                                <th class="p-5">วันที่</th>
-                                <th class="p-5 text-right">ยอดรวม</th>
-                                <th class="p-5 text-center">จัดการ</th>
+                                <th class="p-5">ลูกค้า / ชื่องาน</th>
+                                <th class="p-5 text-right">ยอดรวม (ดู PDF)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="(doc, idx) in filteredHistory" :key="idx" class="hover:bg-slate-50 transition-colors">
                                 <td class="p-5">
                                     <p class="font-bold text-slate-800">{{ doc.customer }}</p>
-                                    <p class="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{{ doc.projectName || 'ไม่ระบุโครงการ' }}</p>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{{ doc.projectName || '-' }}</p>
                                 </td>
-                                <td class="p-5 text-sm text-slate-500">{{ doc.date }}</td>
-                                <td class="p-5 text-right font-black text-indigo-600 text-lg">฿{{ doc.total.toLocaleString() }}</td>
-                                <td class="p-5 text-center">
-                                    <button @click="openPdf(doc)" class="px-5 py-2 rounded-full text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-all">
-                                        ดู PDF
-                                    </button>
+                                <!-- คอลัมน์ยอดรวม กดเพื่อดู PDF และมีวันที่ด้านล่าง -->
+                                <td class="p-5 text-right cursor-pointer group" @click="openPdf(doc)">
+                                    <div class="inline-block px-4 py-2 rounded-xl group-hover:bg-indigo-50 transition-colors text-right border border-transparent group-hover:border-indigo-100">
+                                        <p class="font-black text-indigo-600 text-lg">฿{{ doc.total.toLocaleString() }} <i class="ph ph-file-pdf ml-1"></i></p>
+                                        <p class="text-xs text-slate-400 mt-1">{{ doc.date }}</p>
+                                    </div>
                                 </td>
                             </tr>
                             <tr v-if="filteredHistory.length === 0 && !loadingHistory">
-                                <td colspan="4" class="p-20 text-center text-slate-300">
+                                <td colspan="2" class="p-20 text-center text-slate-300">
                                     <i class="ph ph-file-dashed text-7xl mb-4"></i>
                                     <p class="text-lg font-bold">ไม่พบข้อมูลใบเสนอราคา</p>
                                 </td>
@@ -124,17 +120,14 @@
                     <input type="text" placeholder="ระบุชื่อลูกค้า..." v-model="customerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
                 </div>
                 <div class="space-y-2">
-                    <label class="block text-sm font-bold text-slate-700 ml-1">ชื่อโปรเจกต์ / ชื่องาน</label>
-                    <input type="text" placeholder="ระบุชื่อโปรเจกต์..." v-model="projectName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <label class="block text-sm font-bold text-slate-700 ml-1">ชื่องาน</label>
+                    <input type="text" placeholder="ระบุชื่องาน..." v-model="projectName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
                 </div>
             </div>
 
             <div class="space-y-4">
-                <div class="flex justify-between items-center px-1">
+                <div class="px-1">
                     <label class="text-sm font-bold text-slate-700 uppercase tracking-widest text-xs">รายการสินค้าและบริการ</label>
-                    <button @click="addItem" class="text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-xl flex items-center gap-1.5">
-                        <i class="ph ph-plus-circle"></i> เพิ่มรายการ
-                    </button>
                 </div>
                 
                 <div class="space-y-3">
@@ -161,6 +154,11 @@
                             <i class="ph ph-trash text-2xl"></i>
                         </button>
                     </div>
+
+                    <!-- ปรับตำแหน่งปุ่มเพิ่มรายการมาไว้ด้านล่าง -->
+                    <button @click="addItem" class="w-full py-4 border-2 border-dashed border-slate-200 text-slate-500 rounded-2xl hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 font-bold transition-all flex justify-center items-center gap-2 mt-2">
+                        <i class="ph ph-plus-circle text-xl"></i> เพิ่มรายการสินค้า/บริการ
+                    </button>
                 </div>
             </div>
 
@@ -187,46 +185,53 @@
 
         <!-- VIEW: SETTINGS -->
         <div v-if="view === 'settings'" class="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6 slide-up">
-            <div class="text-center">
-                <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                    <i class="ph ph-buildings text-4xl"></i>
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
+                        <i class="ph ph-buildings text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-800">ตั้งค่าข้อมูลบริษัท</h2>
+                    <p class="text-slate-400 text-sm mt-1">ข้อมูลคลาวด์ใช้ร่วมกันทุกอุปกรณ์</p>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-800">ตั้งค่าข้อมูลบริษัท</h2>
-                <p class="text-slate-400 text-sm">ข้อมูลนี้จะถูกเก็บไว้ในระบบคลาวด์อัตโนมัติ</p>
+                <!-- ปุ่มสลับโหมดแก้ไข -->
+                <button v-if="!isEditingSettings" @click="isEditingSettings = true" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors flex items-center gap-2">
+                    <i class="ph ph-pencil-simple"></i> แก้ไข
+                </button>
             </div>
             
             <div class="space-y-5 pt-2">
                 <div class="space-y-1.5">
                     <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อบริษัท / ร้านค้า</label>
-                    <input type="text" v-model="companyInfo.name" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
+                    <input type="text" v-model="companyInfo.name" :disabled="!isEditingSettings" :class="['w-full p-4 rounded-2xl outline-none transition-all font-bold', isEditingSettings ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500' : 'bg-slate-50/50 border border-transparent text-slate-600']">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1.5">
                         <label class="block text-xs font-bold text-slate-400 uppercase ml-1">เบอร์โทรศัพท์</label>
-                        <input type="text" v-model="companyInfo.phone" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
+                        <input type="text" v-model="companyInfo.phone" :disabled="!isEditingSettings" :class="['w-full p-4 rounded-2xl outline-none transition-all font-bold', isEditingSettings ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500' : 'bg-slate-50/50 border border-transparent text-slate-600']">
                     </div>
                     <div class="space-y-1.5">
                         <label class="block text-xs font-bold text-slate-400 uppercase ml-1">LINE ID</label>
-                        <input type="text" v-model="companyInfo.lineId" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-indigo-600">
+                        <input type="text" v-model="companyInfo.lineId" :disabled="!isEditingSettings" :class="['w-full p-4 rounded-2xl outline-none transition-all font-bold text-indigo-600', isEditingSettings ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500' : 'bg-slate-50/50 border border-transparent']">
                     </div>
                 </div>
                 <div class="space-y-1.5">
                     <label class="block text-xs font-bold text-slate-400 uppercase ml-1">อีเมลติดต่อ</label>
-                    <input type="email" v-model="companyInfo.email" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
+                    <input type="email" v-model="companyInfo.email" :disabled="!isEditingSettings" :class="['w-full p-4 rounded-2xl outline-none transition-all font-bold', isEditingSettings ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500' : 'bg-slate-50/50 border border-transparent text-slate-600']">
                 </div>
                 <div class="space-y-1.5">
-                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อผู้เสนอราคา (แสดงใต้ลายเซ็น)</label>
-                    <input type="text" placeholder="ระบุชื่อ-นามสกุล..." v-model="companyInfo.defaultSignerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-indigo-600">
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อผู้เสนอราคา (ใต้ลายเซ็น)</label>
+                    <input type="text" v-model="companyInfo.defaultSignerName" :disabled="!isEditingSettings" :class="['w-full p-4 rounded-2xl outline-none transition-all font-bold text-indigo-600', isEditingSettings ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500' : 'bg-slate-50/50 border border-transparent']">
                 </div>
                 <div class="space-y-1.5">
-                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">หมายเหตุเริ่มต้น (Default Remark)</label>
-                    <textarea rows="4" v-model="companyInfo.defaultRemark" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm leading-relaxed"></textarea>
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">หมายเหตุเริ่มต้น</label>
+                    <textarea rows="4" v-model="companyInfo.defaultRemark" :disabled="!isEditingSettings" :class="['w-full p-4 rounded-2xl outline-none transition-all resize-none text-sm leading-relaxed', isEditingSettings ? 'bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-500' : 'bg-slate-50/50 border border-transparent text-slate-600']"></textarea>
                 </div>
             </div>
 
-            <div class="pt-4">
-                <button @click="saveSettings" :disabled="loading" class="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-black transition-all disabled:opacity-70">
-                    <span v-if="loading" class="animate-pulse">กำลังบันทึกข้อมูล...</span>
+            <div v-if="isEditingSettings" class="pt-4 flex gap-3 slide-up">
+                <button @click="cancelEditSettings" class="w-1/3 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all">ยกเลิก</button>
+                <button @click="saveSettings" :disabled="loading" class="w-2/3 py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-black transition-all disabled:opacity-70">
+                    <span v-if="loading" class="animate-pulse">กำลังบันทึก...</span>
                     <template v-else>บันทึกการตั้งค่า</template>
                 </button>
             </div>
@@ -237,7 +242,7 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 
-// 🟢 ใส่ URL ของ GAS ที่เพิ่ง Deploy ใหม่ตรงนี้ครับ 🟢
+// 🟢 วาง URL ใหม่ตรงนี้ 🟢
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyOdgzCBWELdmCiU95yrolB8nxOhfuNMge0tuOp4mf9k_VVyx7vKer88SDW-Z9uK4jg/exec";
 
 createApp({
@@ -245,6 +250,7 @@ createApp({
         const view = ref('home');
         const loading = ref(false);
         const loadingHistory = ref(true);
+        const isEditingSettings = ref(false); // สถานะเปิด/ปิดการแก้ไขตั้งค่า
         const searchQuery = ref('');
         const notification = ref({ show: false, message: '', type: 'success' });
 
@@ -265,7 +271,6 @@ createApp({
             setTimeout(() => notification.value.show = false, 4000);
         };
 
-        // ค้นหาบางส่วน ทั้งชื่อลูกค้าและโครงการ
         const filteredHistory = computed(() => {
             const q = searchQuery.value.toLowerCase();
             return history.value.filter(h => 
@@ -284,6 +289,13 @@ createApp({
         const addItem = () => items.value.push({ name: '', qty: 1, price: 0, isLumpSum: false });
         const removeItem = (idx) => items.value.splice(idx, 1);
 
+        const cancelEditSettings = () => {
+            isEditingSettings.value = false;
+            // โหลดคืนค่าเดิมจาก localStorage ถ้ากดยกเลิก
+            const localData = localStorage.getItem('companyInfo');
+            if(localData) companyInfo.value = JSON.parse(localData);
+        };
+
         const saveSettings = async () => {
             loading.value = true;
             try {
@@ -295,8 +307,9 @@ createApp({
                 const result = await response.json();
                 if (result.status === 'success') {
                     remark.value = companyInfo.value.defaultRemark;
-                    showMessage('บันทึกข้อมูลเรียบร้อย ระบบจะจำค่านี้ไว้ใช้งานตลอด');
-                    view.value = 'home';
+                    localStorage.setItem('companyInfo', JSON.stringify(companyInfo.value));
+                    showMessage('บันทึกข้อมูลเรียบร้อย');
+                    isEditingSettings.value = false;
                 }
             } catch (error) {
                 showMessage('เกิดข้อผิดพลาด: ' + error.message, 'error');
@@ -304,7 +317,6 @@ createApp({
             loading.value = false;
         };
 
-        // โหลดประวัติและการตั้งค่าแบบรวดเดียว
         const loadInitialData = async () => {
             if (!GAS_URL) { loadingHistory.value = false; return; }
             try {
@@ -318,13 +330,15 @@ createApp({
                     if (result.settings && result.settings.name) {
                         companyInfo.value = { ...companyInfo.value, ...result.settings };
                         remark.value = companyInfo.value.defaultRemark;
+                        localStorage.setItem('companyInfo', JSON.stringify(companyInfo.value));
                     }
                     if (result.history) {
                         history.value = result.history;
                     }
                 }
             } catch (e) {
-                console.log('Error loading initial data');
+                const localData = localStorage.getItem('companyInfo');
+                if(localData) companyInfo.value = JSON.parse(localData);
             }
             loadingHistory.value = false;
         };
@@ -359,7 +373,6 @@ createApp({
                 
                 if(result.status === 'success') {
                     showMessage('สร้างสำเร็จ! บันทึกเอกสาร PDF แล้ว');
-                    // อัปเดตตารางหน้าเว็บทันที ไม่ต้องรีเฟรช
                     history.value.unshift({ 
                         customer: customerName.value, 
                         projectName: projectName.value,
@@ -368,11 +381,13 @@ createApp({
                         link: result.url
                     });
                     
-                    view.value = 'home';
+                    // เคลียร์ฟอร์มทุกครั้งหลังสร้างเสร็จ (ข้อ 4)
                     customerName.value = ''; 
                     projectName.value = '';
                     items.value = [{ name: '', qty: 1, price: 0, isLumpSum: false }];
                     remark.value = companyInfo.value.defaultRemark;
+                    
+                    view.value = 'home';
                 } else {
                     showMessage('ข้อผิดพลาด: ' + result.message, 'error');
                 }
@@ -383,14 +398,14 @@ createApp({
         };
 
         onMounted(() => {
-            loadInitialData(); // เรียกใช้งานเมื่อเปิดเว็บ
+            loadInitialData();
         });
 
         return {
-            view, loading, loadingHistory, searchQuery, notification, companyInfo, history,
+            view, loading, loadingHistory, isEditingSettings, searchQuery, notification, companyInfo, history,
             customerName, projectName, remark, items,
             filteredHistory, calculateTotal,
-            addItem, removeItem, saveSettings, openPdf, submitQuotation
+            addItem, removeItem, cancelEditSettings, saveSettings, openPdf, submitQuotation
         };
     }
 }).mount('#app');
