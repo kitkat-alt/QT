@@ -46,6 +46,22 @@
         
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .slide-up { animation: slideUp 0.4s ease-out; }
+        
+        /* สไตล์สำหรับ Preview PDF กระดาษ A4 ให้ตรงกับของจริงมากขึ้น */
+        .a4-preview {
+            aspect-ratio: 1 / 1.414;
+            background-color: white;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .a4-header-bar {
+            height: 6px;
+            background-color: #4f46e5;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 selection:bg-indigo-100 pb-10">
@@ -137,94 +153,208 @@
         </div>
 
         <!-- VIEW: CREATE -->
-        <div v-if="view === 'create'" class="slide-up max-w-3xl mx-auto space-y-6">
-            <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 space-y-8">
-                <div class="border-b border-slate-100 pb-4">
-                    <h2 class="text-2xl font-bold text-slate-800">สร้างใบเสนอราคาใหม่</h2>
-                    <p class="text-slate-400 text-sm">ข้อมูลจะถูกบันทึกและสร้าง PDF ลง Google Drive อัตโนมัติ</p>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-bold text-slate-700 ml-1">ชื่อลูกค้า / บริษัท <span class="text-rose-500">*</span></label>
-                        <input type="text" placeholder="ระบุชื่อลูกค้า..." v-model="customerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="block text-sm font-bold text-slate-700 ml-1">ชื่องาน</label>
-                        <input type="text" placeholder="ระบุชื่องาน..." v-model="projectName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="px-1">
-                        <label class="text-sm font-bold text-slate-700 uppercase tracking-widest text-xs">รายการสินค้าและบริการ</label>
-                    </div>
-                    
-                    <div class="space-y-3">
-                        <div v-for="(item, idx) in items" :key="idx" class="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 p-5 rounded-2xl border border-slate-200 relative">
-                            <div class="flex-1 w-full">
-                                <div class="flex justify-between items-center mb-2">
-                                    <label class="text-xs font-bold text-slate-400 uppercase">รายละเอียด</label>
-                                    <label class="flex items-center gap-2 text-xs font-bold text-slate-500 cursor-pointer">
-                                        <input type="checkbox" v-model="item.isLumpSum" class="rounded text-indigo-600 w-4 h-4">
-                                        ราคาเหมา
-                                    </label>
-                                </div>
-                                <input type="text" placeholder="ระบุชื่อรายการ" v-model="item.name" class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
-                            </div>
-                            <div class="w-full sm:w-28">
-                                <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">{{ item.isLumpSum ? '-' : 'จำนวน' }}</label>
-                                <input type="number" v-model.number="item.qty" :disabled="item.isLumpSum" :class="['w-full p-3 border border-slate-200 rounded-xl text-center outline-none', item.isLumpSum ? 'bg-slate-200 text-slate-400' : 'bg-white focus:ring-2 focus:ring-indigo-500']">
-                            </div>
-                            <div class="w-full sm:w-36">
-                                <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">{{ item.isLumpSum ? 'ราคารวม' : 'ราคา/หน่วย' }}</label>
-                                <input type="number" v-model.number="item.price" class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold">
-                            </div>
-                            <button @click="removeItem(idx)" class="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
-                                <i class="ph ph-trash text-2xl"></i>
-                            </button>
+        <div v-if="view === 'create'" class="slide-up">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- Left Column: Form -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 space-y-8">
+                        <div class="border-b border-slate-100 pb-4">
+                            <h2 class="text-2xl font-bold text-slate-800">สร้างใบเสนอราคาใหม่</h2>
+                            <p class="text-slate-400 text-sm">ข้อมูลจะแสดงตัวอย่างในกระดาษด้านขวา</p>
                         </div>
 
-                        <button @click="addItem" class="w-full py-4 border-2 border-dashed border-slate-200 text-slate-500 rounded-2xl hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 font-bold transition-all flex justify-center items-center gap-2 mt-2">
-                            <i class="ph ph-plus-circle text-xl"></i> เพิ่มรายการ
-                        </button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="block text-sm font-bold text-slate-700 ml-1">ชื่อลูกค้า / บริษัท <span class="text-rose-500">*</span></label>
+                                <input type="text" placeholder="ระบุชื่อลูกค้า..." v-model="customerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-sm font-bold text-slate-700 ml-1">ชื่องาน</label>
+                                <input type="text" placeholder="ระบุชื่องาน..." v-model="projectName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="px-1">
+                                <label class="text-sm font-bold text-slate-700 uppercase tracking-widest text-xs">รายการสินค้าและบริการ</label>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div v-for="(item, idx) in items" :key="idx" class="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 p-5 rounded-2xl border border-slate-200 relative">
+                                    <div class="flex-1 w-full">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <label class="text-xs font-bold text-slate-400 uppercase">รายละเอียด</label>
+                                            <label class="flex items-center gap-2 text-xs font-bold text-slate-500 cursor-pointer">
+                                                <input type="checkbox" v-model="item.isLumpSum" class="rounded text-indigo-600 w-4 h-4">
+                                                ราคาเหมา
+                                            </label>
+                                        </div>
+                                        <input type="text" placeholder="ระบุชื่อรายการ" v-model="item.name" class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                                    </div>
+                                    <div class="w-full sm:w-28">
+                                        <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">{{ item.isLumpSum ? '-' : 'จำนวน' }}</label>
+                                        <input type="number" v-model.number="item.qty" :disabled="item.isLumpSum" :class="['w-full p-3 border border-slate-200 rounded-xl text-center outline-none', item.isLumpSum ? 'bg-slate-200 text-slate-400' : 'bg-white focus:ring-2 focus:ring-indigo-500']">
+                                    </div>
+                                    <div class="w-full sm:w-36">
+                                        <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">{{ item.isLumpSum ? 'ราคารวม' : 'ราคา/หน่วย' }}</label>
+                                        <input type="number" v-model.number="item.price" class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold">
+                                    </div>
+                                    <button @click="removeItem(idx)" class="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
+                                        <i class="ph ph-trash text-2xl"></i>
+                                    </button>
+                                </div>
+
+                                <button @click="addItem" class="w-full py-4 border-2 border-dashed border-slate-200 text-slate-500 rounded-2xl hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 font-bold transition-all flex justify-center items-center gap-2 mt-2">
+                                    <i class="ph ph-plus-circle text-xl"></i> เพิ่มรายการ
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- ส่วนลด -->
+                        <div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                            <span class="font-bold text-slate-700">ส่วนลดท้ายบิล</span>
+                            <div class="flex items-center gap-2 mt-3 sm:mt-0">
+                                <input type="number" v-model.number="discountValue" placeholder="0" class="w-32 p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold">
+                                <select v-model="discountType" class="p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold cursor-pointer">
+                                    <option value="amount">บาท</option>
+                                    <option value="percent">%</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="block text-sm font-bold text-slate-700 ml-1">หมายเหตุและเงื่อนไข (แก้ไขได้)</label>
+                            <textarea rows="4" placeholder="ระบุเงื่อนไขการชำระเงิน..." v-model="remark" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm"></textarea>
+                        </div>
+
+                        <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-xl">
+                            <div>
+                                <span class="text-slate-400 font-bold uppercase tracking-widest text-xs">ยอดรวมสุทธิ</span>
+                                <div v-if="discountAmount > 0" class="text-sm text-emerald-400 mt-1">ประหยัดไป {{ discountAmount.toLocaleString() }} บาท</div>
+                            </div>
+                            <span class="text-4xl font-black tracking-tighter text-indigo-400">฿{{ netTotal.toLocaleString() }}</span>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                            <button @click="view = 'home'" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200">ยกเลิก</button>
+                            <button @click="submitQuotation" :disabled="loading" class="flex-[2] py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50">
+                                <span v-if="loading" class="flex items-center justify-center gap-2">
+                                    <i class="ph ph-circle-notch animate-spin text-xl"></i> กำลังบันทึก...
+                                </span>
+                                <template v-else><i class="ph ph-check-circle text-xl mr-1"></i> ยืนยันและสร้างใบเสนอราคา</template>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- ส่วนลด -->
-                <div class="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                    <span class="font-bold text-slate-700">ส่วนลดท้ายบิล</span>
-                    <div class="flex items-center gap-2 mt-3 sm:mt-0">
-                        <input type="number" v-model.number="discountValue" placeholder="0" class="w-32 p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold">
-                        <select v-model="discountType" class="p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold cursor-pointer">
-                            <option value="amount">บาท</option>
-                            <option value="percent">%</option>
-                        </select>
+                <!-- Right Column: Live PDF Preview -->
+                <div class="hidden lg:block lg:col-span-5 relative">
+                    <div class="sticky top-24 a4-preview p-8 flex flex-col text-[12px] leading-relaxed text-slate-800 rounded overflow-hidden">
+                        <div class="a4-header-bar"></div>
+                        
+                        <!-- Header -->
+                        <div class="flex justify-between items-start mb-6 pt-2">
+                            <div class="w-[55%] pr-4">
+                                <h1 class="text-indigo-600 text-xl font-bold mb-1">{{ companyInfo.name || 'ชื่อบริษัท / ร้านค้า' }}</h1>
+                                <div class="text-slate-500 text-[11px]">
+                                    โทรศัพท์: {companyInfo.phone || '-'}<br>
+                                    <span v-if="companyInfo.email">อีเมล: {companyInfo.email}<br></span>
+                                    <span v-if="companyInfo.lineId">LINE ID: {companyInfo.lineId}</span>
+                                </div>
+                            </div>
+                            <div class="w-[45%] text-right">
+                                <h2 class="text-slate-200 text-2xl font-bold tracking-widest m-0">QUOTATION</h2>
+                                <div class="mt-2 text-[11px] text-slate-700">
+                                    <strong>เลขที่เอกสาร:</strong> QT-XXXXXX<br>
+                                    <strong>วันที่:</strong> {{ new Date().toLocaleDateString('th-TH') }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Customer Info -->
+                        <div class="bg-slate-50 p-4 border-l-4 border-indigo-600 rounded mb-6">
+                            <div class="w-full text-[12px]">
+                                <strong>เสนอราคาให้:</strong> <span class="text-[14px]">{{ customerName || '..................................................' }}</span><br>
+                                <span v-if="projectName"><strong>ชื่องาน / โครงการ:</strong> {{ projectName }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Items Table -->
+                        <table class="w-full border-collapse mb-8 text-[12px]">
+                            <thead>
+                                <tr class="bg-indigo-600 text-white text-left">
+                                    <th class="p-2 border border-indigo-600 w-[5%] text-center">#</th>
+                                    <th class="p-2 border border-indigo-600 w-[45%]">รายการสินค้า / บริการ</th>
+                                    <th class="p-2 border border-indigo-600 w-[15%] text-center">จำนวน</th>
+                                    <th class="p-2 border border-indigo-600 w-[15%] text-right">ราคา/หน่วย</th>
+                                    <th class="p-2 border border-indigo-600 w-[20%] text-right">รวมเป็นเงิน</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(item, idx) in items" :key="idx" class="even:bg-slate-50">
+                                    <td class="p-2 border border-slate-200 text-center">{{ idx + 1 }}</td>
+                                    <td class="p-2 border border-slate-200 font-bold text-slate-700">
+                                        {{ item.name || '...' }} 
+                                        <span v-if="item.isLumpSum" class="text-[10px] text-slate-400 font-normal ml-1">(ราคาเหมา)</span>
+                                    </td>
+                                    <td class="p-2 border border-slate-200 text-center">{{ item.isLumpSum ? '-' : item.qty }}</td>
+                                    <td class="p-2 border border-slate-200 text-right">{{ item.isLumpSum ? '-' : (item.price || 0).toLocaleString() }}</td>
+                                    <td class="p-2 border border-slate-200 text-right font-bold text-slate-700">
+                                        {{ (item.isLumpSum ? item.price : item.qty * item.price).toLocaleString() }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Totals & Remark -->
+                        <div class="flex gap-4 mt-auto mb-10">
+                            <div class="w-[55%] pr-4">
+                                <strong class="text-slate-600 text-[12px]">หมายเหตุ / เงื่อนไข:</strong>
+                                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 mt-1 min-h-[70px]">
+                                    <p class="whitespace-pre-line text-slate-500 text-[11px] overflow-hidden line-clamp-5">{{ remark }}</p>
+                                </div>
+                            </div>
+                            <div class="w-[45%]">
+                                <div class="bg-slate-100 p-3 rounded-lg">
+                                    <table class="w-full text-[12px]">
+                                        <tr>
+                                            <td class="py-1 text-slate-500">รวมเป็นเงิน</td>
+                                            <td class="py-1 text-right font-bold">{{ subTotal.toLocaleString() }} บาท</td>
+                                        </tr>
+                                        <tr v-if="discountAmount > 0" class="text-rose-500">
+                                            <td class="py-1">หักส่วนลด</td>
+                                            <td class="py-1 text-right font-bold">-{{ discountAmount.toLocaleString() }} บาท</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="py-1 text-slate-500">ภาษีมูลค่าเพิ่ม 0%</td>
+                                            <td class="py-1 text-right">0 บาท</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pt-3 border-t-2 border-slate-300 text-indigo-600 font-bold text-[14px]">ยอดรวมสุทธิ</td>
+                                            <td class="pt-3 border-t-2 border-slate-300 text-right text-indigo-600 font-bold text-[14px]">{{ netTotal.toLocaleString() }} บาท</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Signatures -->
+                        <div class="flex justify-between px-6 pt-6">
+                            <div class="text-center w-[45%]">
+                                <div class="border-t border-slate-400 pt-1 font-bold text-[14px] w-40 mx-auto">{{ companyInfo.defaultSignerName || '..................................................' }}</div>
+                                <div class="text-slate-500 mt-1">ผู้เสนอราคา</div>
+                                <div class="text-slate-400 text-[10px] mt-1">วันที่: ......./......./.......</div>
+                            </div>
+                            <div class="text-center w-[45%]">
+                                <div class="border-t border-slate-400 pt-1 font-bold text-[14px] w-40 mx-auto text-transparent">.</div>
+                                <div class="text-slate-500 mt-1">ผู้อนุมัติ / ลูกค้า</div>
+                                <div class="text-slate-400 text-[10px] mt-1">วันที่: ......./......./.......</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="space-y-2">
-                    <label class="block text-sm font-bold text-slate-700 ml-1">หมายเหตุและเงื่อนไข (แก้ไขได้)</label>
-                    <textarea rows="4" placeholder="ระบุเงื่อนไขการชำระเงิน..." v-model="remark" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm"></textarea>
-                </div>
-
-                <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-xl">
-                    <div>
-                        <span class="text-slate-400 font-bold uppercase tracking-widest text-xs">ยอดรวมสุทธิ</span>
-                        <div v-if="discountAmount > 0" class="text-sm text-emerald-400 mt-1">ประหยัดไป {{ discountAmount.toLocaleString() }} บาท</div>
-                    </div>
-                    <span class="text-4xl font-black tracking-tighter text-indigo-400">฿{{ netTotal.toLocaleString() }}</span>
-                </div>
-
-                <div class="flex flex-col sm:flex-row gap-4 pt-4">
-                    <button @click="view = 'home'" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200">ยกเลิก</button>
-                    <button @click="submitQuotation" :disabled="loading" class="flex-[2] py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50">
-                        <span v-if="loading" class="flex items-center justify-center gap-2">
-                            <i class="ph ph-circle-notch animate-spin text-xl"></i> กำลังบันทึก...
-                        </span>
-                        <template v-else><i class="ph ph-check-circle text-xl mr-1"></i> ยืนยันและสร้างใบเสนอราคา</template>
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -319,12 +449,11 @@ createApp({
         };
 
         const filteredHistory = computed(() => {
-            const q = String(searchQuery.value).toLowerCase();
-            return history.value.filter(h => {
-                const customerMatch = h.customer ? String(h.customer).toLowerCase().includes(q) : false;
-                const projectMatch = h.projectName ? String(h.projectName).toLowerCase().includes(q) : false;
-                return customerMatch || projectMatch;
-            });
+            const q = searchQuery.value.toLowerCase();
+            return history.value.filter(h => 
+                (h.customer && h.customer.toLowerCase().includes(q)) || 
+                (h.projectName && h.projectName.toLowerCase().includes(q))
+            );
         });
 
         const subTotal = computed(() => {
