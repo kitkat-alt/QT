@@ -62,6 +62,10 @@
             top: 0;
             left: 0;
         }
+        
+        /* ซ่อน Scrollbar ใน Preview แต่ยัง Scroll ได้ */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 selection:bg-indigo-100 pb-10">
@@ -250,22 +254,22 @@
 
                 <!-- Right Column: Live PDF Preview -->
                 <div class="hidden lg:block lg:col-span-5 relative">
-                    <div class="sticky top-24 a4-preview p-8 flex flex-col text-[12px] leading-relaxed text-slate-800 rounded overflow-hidden">
+                    <div class="sticky top-24 a4-preview p-8 flex flex-col text-sm leading-relaxed text-slate-800 rounded overflow-y-auto scrollbar-hide">
                         <div class="a4-header-bar"></div>
                         
                         <!-- Header -->
                         <div class="flex justify-between items-start mb-6 pt-2">
                             <div class="w-[55%] pr-4">
-                                <h1 class="text-indigo-600 text-xl font-bold mb-1">{{ companyInfo.name || 'ชื่อบริษัท / ร้านค้า' }}</h1>
-                                <div class="text-slate-500 text-[11px]">
-                                    โทรศัพท์: {companyInfo.phone || '-'}<br>
-                                    <span v-if="companyInfo.email">อีเมล: {companyInfo.email}<br></span>
-                                    <span v-if="companyInfo.lineId">LINE ID: {companyInfo.lineId}</span>
+                                <h1 class="text-indigo-600 text-2xl font-bold mb-1">{{ companyInfo.name || 'ชื่อบริษัท / ร้านค้า' }}</h1>
+                                <div class="text-slate-500 text-xs">
+                                    โทรศัพท์: {{ companyInfo.phone || '-' }}<br>
+                                    <span v-if="companyInfo.email">อีเมล: {{ companyInfo.email }}<br></span>
+                                    <span v-if="companyInfo.lineId">LINE ID: {{ companyInfo.lineId }}</span>
                                 </div>
                             </div>
                             <div class="w-[45%] text-right">
-                                <h2 class="text-slate-200 text-2xl font-bold tracking-widest m-0">QUOTATION</h2>
-                                <div class="mt-2 text-[11px] text-slate-700">
+                                <h2 class="text-slate-200 text-3xl font-bold tracking-widest m-0">QUOTATION</h2>
+                                <div class="mt-2 text-xs text-slate-700">
                                     <strong>เลขที่เอกสาร:</strong> QT-XXXXXX<br>
                                     <strong>วันที่:</strong> {{ new Date().toLocaleDateString('th-TH') }}
                                 </div>
@@ -274,33 +278,33 @@
 
                         <!-- Customer Info -->
                         <div class="bg-slate-50 p-4 border-l-4 border-indigo-600 rounded mb-6">
-                            <div class="w-full text-[12px]">
-                                <strong>เสนอราคาให้:</strong> <span class="text-[14px]">{{ customerName || '..................................................' }}</span><br>
+                            <div class="w-full text-sm">
+                                <strong>เสนอราคาให้:</strong> <span class="text-base font-bold text-slate-800">{{ customerName || '..................................................' }}</span><br>
                                 <span v-if="projectName"><strong>ชื่องาน / โครงการ:</strong> {{ projectName }}</span>
                             </div>
                         </div>
 
                         <!-- Items Table -->
-                        <table class="w-full border-collapse mb-8 text-[12px]">
+                        <table class="w-full border-collapse mb-8 text-sm">
                             <thead>
                                 <tr class="bg-indigo-600 text-white text-left">
-                                    <th class="p-2 border border-indigo-600 w-[5%] text-center">#</th>
-                                    <th class="p-2 border border-indigo-600 w-[45%]">รายการสินค้า / บริการ</th>
-                                    <th class="p-2 border border-indigo-600 w-[15%] text-center">จำนวน</th>
-                                    <th class="p-2 border border-indigo-600 w-[15%] text-right">ราคา/หน่วย</th>
-                                    <th class="p-2 border border-indigo-600 w-[20%] text-right">รวมเป็นเงิน</th>
+                                    <th class="p-2.5 border border-indigo-600 w-[5%] text-center">#</th>
+                                    <th class="p-2.5 border border-indigo-600 w-[45%]">รายการสินค้า / บริการ</th>
+                                    <th class="p-2.5 border border-indigo-600 w-[15%] text-center">จำนวน</th>
+                                    <th class="p-2.5 border border-indigo-600 w-[15%] text-right">ราคา/หน่วย</th>
+                                    <th class="p-2.5 border border-indigo-600 w-[20%] text-right">รวมเป็นเงิน</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="(item, idx) in items" :key="idx" class="even:bg-slate-50">
-                                    <td class="p-2 border border-slate-200 text-center">{{ idx + 1 }}</td>
-                                    <td class="p-2 border border-slate-200 font-bold text-slate-700">
+                                    <td class="p-2.5 border border-slate-200 text-center">{{ idx + 1 }}</td>
+                                    <td class="p-2.5 border border-slate-200 font-bold text-slate-700">
                                         {{ item.name || '...' }} 
-                                        <span v-if="item.isLumpSum" class="text-[10px] text-slate-400 font-normal ml-1">(ราคาเหมา)</span>
+                                        <span v-if="item.isLumpSum" class="text-xs text-slate-400 font-normal ml-1">(ราคาเหมา)</span>
                                     </td>
-                                    <td class="p-2 border border-slate-200 text-center">{{ item.isLumpSum ? '-' : item.qty }}</td>
-                                    <td class="p-2 border border-slate-200 text-right">{{ item.isLumpSum ? '-' : (item.price || 0).toLocaleString() }}</td>
-                                    <td class="p-2 border border-slate-200 text-right font-bold text-slate-700">
+                                    <td class="p-2.5 border border-slate-200 text-center">{{ item.isLumpSum ? '-' : item.qty }}</td>
+                                    <td class="p-2.5 border border-slate-200 text-right">{{ item.isLumpSum ? '-' : (item.price || 0).toLocaleString() }}</td>
+                                    <td class="p-2.5 border border-slate-200 text-right font-bold text-slate-700">
                                         {{ (item.isLumpSum ? item.price : item.qty * item.price).toLocaleString() }}
                                     </td>
                                 </tr>
@@ -310,14 +314,14 @@
                         <!-- Totals & Remark -->
                         <div class="flex gap-4 mt-auto mb-10">
                             <div class="w-[55%] pr-4">
-                                <strong class="text-slate-600 text-[12px]">หมายเหตุ / เงื่อนไข:</strong>
+                                <strong class="text-slate-600 text-sm">หมายเหตุ / เงื่อนไข:</strong>
                                 <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 mt-1 min-h-[70px]">
-                                    <p class="whitespace-pre-line text-slate-500 text-[11px] overflow-hidden line-clamp-5">{{ remark }}</p>
+                                    <p class="whitespace-pre-line text-slate-600 text-xs overflow-hidden line-clamp-5">{{ remark }}</p>
                                 </div>
                             </div>
                             <div class="w-[45%]">
-                                <div class="bg-slate-100 p-3 rounded-lg">
-                                    <table class="w-full text-[12px]">
+                                <div class="bg-slate-100 p-4 rounded-lg">
+                                    <table class="w-full text-sm">
                                         <tr>
                                             <td class="py-1 text-slate-500">รวมเป็นเงิน</td>
                                             <td class="py-1 text-right font-bold">{{ subTotal.toLocaleString() }} บาท</td>
@@ -331,8 +335,8 @@
                                             <td class="py-1 text-right">0 บาท</td>
                                         </tr>
                                         <tr>
-                                            <td class="pt-3 border-t-2 border-slate-300 text-indigo-600 font-bold text-[14px]">ยอดรวมสุทธิ</td>
-                                            <td class="pt-3 border-t-2 border-slate-300 text-right text-indigo-600 font-bold text-[14px]">{{ netTotal.toLocaleString() }} บาท</td>
+                                            <td class="pt-3 border-t-2 border-slate-300 text-indigo-600 font-bold text-base">ยอดรวมสุทธิ</td>
+                                            <td class="pt-3 border-t-2 border-slate-300 text-right text-indigo-600 font-bold text-lg">{{ netTotal.toLocaleString() }} บาท</td>
                                         </tr>
                                     </table>
                                 </div>
@@ -340,16 +344,16 @@
                         </div>
 
                         <!-- Signatures -->
-                        <div class="flex justify-between px-6 pt-6">
+                        <div class="flex justify-between px-6 pt-6 mt-4">
                             <div class="text-center w-[45%]">
-                                <div class="border-t border-slate-400 pt-1 font-bold text-[14px] w-40 mx-auto">{{ companyInfo.defaultSignerName || '..................................................' }}</div>
+                                <div class="border-t border-slate-400 pt-2 font-bold text-base w-40 mx-auto">{{ companyInfo.defaultSignerName || '..................................................' }}</div>
                                 <div class="text-slate-500 mt-1">ผู้เสนอราคา</div>
-                                <div class="text-slate-400 text-[10px] mt-1">วันที่: ......./......./.......</div>
+                                <div class="text-slate-400 text-xs mt-1">วันที่: ......./......./.......</div>
                             </div>
                             <div class="text-center w-[45%]">
-                                <div class="border-t border-slate-400 pt-1 font-bold text-[14px] w-40 mx-auto text-transparent">.</div>
+                                <div class="border-t border-slate-400 pt-2 font-bold text-base w-40 mx-auto text-transparent">.</div>
                                 <div class="text-slate-500 mt-1">ผู้อนุมัติ / ลูกค้า</div>
-                                <div class="text-slate-400 text-[10px] mt-1">วันที่: ......./......./.......</div>
+                                <div class="text-slate-400 text-xs mt-1">วันที่: ......./......./.......</div>
                             </div>
                         </div>
                     </div>
@@ -449,11 +453,12 @@ createApp({
         };
 
         const filteredHistory = computed(() => {
-            const q = searchQuery.value.toLowerCase();
-            return history.value.filter(h => 
-                (h.customer && h.customer.toLowerCase().includes(q)) || 
-                (h.projectName && h.projectName.toLowerCase().includes(q))
-            );
+            const q = String(searchQuery.value).toLowerCase();
+            return history.value.filter(h => {
+                const customerMatch = h.customer ? String(h.customer).toLowerCase().includes(q) : false;
+                const projectMatch = h.projectName ? String(h.projectName).toLowerCase().includes(q) : false;
+                return customerMatch || projectMatch;
+            });
         });
 
         const subTotal = computed(() => {
