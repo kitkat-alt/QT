@@ -1,195 +1,389 @@
-/**
- * ระบบ Backend สำหรับจัดการใบเสนอราคา
- * จัดการโดย: กิต โซลูชั่น จำกัด
- */
-
-const FOLDER_ID = "1OZDzFqsQ_55Xipuyi5uxxpmVqGBylML1"; // โฟลเดอร์หลักใน Google Drive สำหรับเก็บใบเสนอราคา
-const SHEET_NAME = "History"; 
-const SETTINGS_SHEET_NAME = "Settings";
-
-/**
- * รับค่าจาก Frontend (index.html)
- */
-function doPost(e) {
-  try {
-    const data = JSON.parse(e.postData.contents);
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QT by กิต โซลูชั่น จำกัด</title>
     
-    // 1. สร้างใบเสนอราคาและบันทึก PDF
-    if (data.action === 'createQuotation') {
-      const pdfUrl = generatePDFAndSave(data);
-      saveToSheet(data, pdfUrl);
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success', url: pdfUrl })).setMimeType(ContentService.MimeType.JSON);
-    } 
-    // 2. บันทึกการตั้งค่าบริษัทลง Sheet
-    else if (data.action === 'saveSettings') {
-      saveCompanySettings(data.settings);
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success' })).setMimeType(ContentService.MimeType.JSON);
-    } 
-    // 3. ดึงการตั้งค่าบริษัทจาก Sheet
-    else if (data.action === 'getSettings') {
-      const settings = getCompanySettings();
-      return ContentService.createTextOutput(JSON.stringify({ status: 'success', settings: settings })).setMimeType(ContentService.MimeType.JSON);
-    }
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'ไม่พบคำสั่งที่ต้องการ' })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * บันทึกการตั้งค่าลง Sheet (Settings)
- */
-function saveCompanySettings(settings) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME) || ss.insertSheet(SETTINGS_SHEET_NAME);
-  sheet.clear();
-  const dataToSave = [
-    ["key", "value"],
-    ["name", settings.name || ""],
-    ["phone", settings.phone || ""],
-    ["email", settings.email || ""],
-    ["lineId", settings.lineId || ""],
-    ["defaultRemark", settings.defaultRemark || ""],
-    ["defaultSignerName", settings.defaultSignerName || ""]
-  ];
-  sheet.getRange(1, 1, dataToSave.length, 2).setValues(dataToSave);
-}
-
-/**
- * ดึงการตั้งค่าจาก Sheet (Settings)
- */
-function getCompanySettings() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
-  if (!sheet) return null;
-  
-  const data = sheet.getDataRange().getValues();
-  let settings = {};
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0]) settings[data[i][0]] = String(data[i][1]);
-  }
-  return settings;
-}
-
-/**
- * สร้าง PDF และบันทึกลงโฟลเดอร์ลูกค้า
- */
-function generatePDFAndSave(data) {
-  const rootFolder = DriveApp.getFolderById(FOLDER_ID);
-  
-  // ค้นหาหรือสร้างโฟลเดอร์ย่อยตามชื่อลูกค้า
-  let customerFolders = rootFolder.searchFolders(`title = '${data.customer}'`);
-  let customerFolder = customerFolders.hasNext() ? customerFolders.next() : rootFolder.createFolder(data.customer);
-  
-  // สร้างโครงสร้าง HTML สำหรับ PDF
-  let html = `
-    <div style="font-family: 'Sarabun', sans-serif; padding: 20px; line-height: 1.6;">
-      <h1 style="color: #4f46e5; text-align: center;">ใบเสนอราคา (Quotation)</h1>
-      <table style="width: 100%; margin-bottom: 20px;">
-        <tr>
-          <td style="vertical-align: top; width: 50%;">
-            <strong>ผู้เสนอราคา:</strong><br>
-            ${data.company.name}<br>
-            โทร: ${data.company.phone}<br>
-            ${data.company.email ? 'อีเมล: ' + data.company.email : ''}
-            ${data.company.lineId ? '<br>LINE: ' + data.company.lineId : ''}
-          </td>
-          <td style="text-align: right; vertical-align: top; width: 50%;">
-            <strong>วันที่:</strong> ${new Date().toLocaleDateString('th-TH')}<br>
-            <strong>ลูกค้า:</strong> ${data.customer}<br>
-            ${data.projectName ? '<strong>โครงการ:</strong> ' + data.projectName : ''}
-          </td>
-        </tr>
-      </table>
-      
-      <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
-        <thead style="background-color: #f8fafc;">
-          <tr>
-            <th style="text-align: center;">ลำดับ</th>
-            <th>รายการสินค้า/บริการ</th>
-            <th style="width: 80px; text-align: center;">จำนวน</th>
-            <th style="width: 120px; text-align: right;">ราคา/หน่วย</th>
-            <th style="width: 120px; text-align: right;">รวมเป็นเงิน</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-  
-  data.items.forEach((item, index) => {
-    const qtyText = item.isLumpSum ? '-' : item.qty;
-    const priceText = item.isLumpSum ? '-' : item.price.toLocaleString();
-    const itemTotal = item.isLumpSum ? item.price : (item.qty * item.price);
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    html += `
-      <tr>
-        <td style="text-align: center;">${index + 1}</td>
-        <td>${item.name} ${item.isLumpSum ? '(ราคาเหมา)' : ''}</td>
-        <td style="text-align: center;">${qtyText}</td>
-        <td style="text-align: right;">${priceText}</td>
-        <td style="text-align: right;">${itemTotal.toLocaleString()}</td>
-      </tr>
-    `;
-  });
-  
-  html += `
-        </tbody>
-      </table>
-      
-      <div style="margin-top: 20px;">
-        <table style="width: 100%;">
-          <tr>
-            <td style="vertical-align: top; width: 60%;">
-              <strong>หมายเหตุ / เงื่อนไข:</strong><br>
-              <div style="white-space: pre-wrap; font-size: 13px; color: #475569; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;">${data.remark || '-'}</div>
-            </td>
-            <td style="text-align: right; vertical-align: top;">
-              <h2 style="color: #4f46e5; margin: 0;">ยอดรวมสุทธิ: ${data.total.toLocaleString()} บาท</h2>
-              <p style="font-size: 12px; color: #94a3b8;">(ภาษีมูลค่าเพิ่ม 0%)</p>
-            </td>
-          </tr>
-        </table>
-      </div>
-      
-      <div style="margin-top: 60px;">
-        <table style="width: 100%;">
-          <tr>
-            <td style="text-align: center; width: 50%;">
-              <div style="height: 40px; border-bottom: 1px solid #000; width: 180px; margin: 0 auto; font-weight: bold; font-size: 18px; display: flex; align-items: flex-end; justify-content: center;">
-                ${data.company.defaultSignerName || ''}
-              </div>
-              <p style="margin-top: 5px;">ผู้เสนอราคา</p>
-            </td>
-            <td style="text-align: center; width: 50%;">
-              <div style="height: 40px; border-bottom: 1px solid #000; width: 180px; margin: 0 auto;"></div>
-              <p style="margin-top: 5px;">ผู้อนุมัติ / ลูกค้า</p>
-            </td>
-          </tr>
-        </table>
-      </div>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+        body { font-family: 'Sarabun', sans-serif; }
+        [v-cloak] { display: none; }
+        
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.4s ease-out; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 selection:bg-indigo-100">
+
+<div id="app" v-cloak>
+    <!-- Message Box (Custom Alert) -->
+    <div v-if="notification.show" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 slide-up">
+        <div :class="['p-4 rounded-2xl shadow-2xl border flex items-center gap-3', notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800']">
+            <i :class="['ph-bold text-2xl', notification.type === 'success' ? 'ph-check-circle' : 'ph-warning-circle']"></i>
+            <p class="font-bold flex-1">{{ notification.message }}</p>
+            <button @click="notification.show = false"><i class="ph ph-x text-lg"></i></button>
+        </div>
     </div>
-  `;
-  
-  // แปลง HTML เป็น PDF และบันทึก
-  const blob = HtmlService.createHtmlOutput(html).getAs('application/pdf').setName(`ใบเสนอราคา_${data.customer}_${new Date().getTime()}.pdf`);
-  const file = customerFolder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  
-  return file.getUrl();
-}
 
-/**
- * บันทึกประวัติการสร้างลง Sheet (History)
- */
-function saveToSheet(data, pdfUrl) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["วันที่", "ลูกค้า", "โครงการ", "ยอดรวม", "ลิงก์ PDF"]);
-  }
-  sheet.appendRow([new Date(), data.customer, data.projectName || '-', data.total, pdfUrl]);
-}
+    <!-- Navbar -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-extrabold flex items-center gap-2 cursor-pointer bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600" @click="view = 'home'">
+                <i class="ph ph-file-text text-indigo-600 text-3xl"></i>
+                QT by กิต โซลูชั่น จำกัด
+            </h1>
+            <div class="flex gap-2">
+                <button @click="view = 'home'" :class="['p-2.5 rounded-xl transition-all text-xl', view === 'home' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600']">
+                    <i class="ph ph-house"></i>
+                </button>
+                <button @click="view = 'settings'" :class="['p-2.5 rounded-xl transition-all text-xl', view === 'settings' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600']">
+                    <i class="ph ph-gear"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
 
-function doGet(e) {
-  return ContentService.createTextOutput("ระบบทำงานปกติ").setMimeType(ContentService.MimeType.TEXT);
-}
+    <main class="max-w-5xl mx-auto p-4 mt-6">
+        
+        <!-- VIEW: HOME -->
+        <div v-if="view === 'home'" class="space-y-8 slide-up">
+            <div class="flex flex-col sm:flex-row justify-between gap-4 items-center">
+                <div class="relative w-full sm:w-96">
+                    <i class="ph ph-magnifying-glass absolute left-4 top-3.5 text-slate-400 text-lg"></i>
+                    <input type="text" placeholder="ค้นหาชื่อลูกค้า..." v-model="searchQuery" class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button @click="view = 'create'" class="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-indigo-200 hover:shadow-lg hover:-translate-y-0.5 transition-all font-bold">
+                    <i class="ph ph-plus text-xl"></i> สร้างใบเสนอราคา
+                </button>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50/50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-widest font-bold">
+                                <th class="p-5">ชื่อลูกค้า / บริษัท</th>
+                                <th class="p-5">โครงการ</th>
+                                <th class="p-5">วันที่</th>
+                                <th class="p-5 text-right">ยอดรวม</th>
+                                <th class="p-5 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(doc, idx) in filteredHistory" :key="idx" class="hover:bg-slate-50 transition-colors">
+                                <td class="p-5 font-bold text-slate-800">{{ doc.customer }}</td>
+                                <td class="p-5 text-sm text-slate-500">{{ doc.projectName || '-' }}</td>
+                                <td class="p-5 text-sm text-slate-500">{{ doc.date }}</td>
+                                <td class="p-5 text-right font-black text-indigo-600 text-lg">฿{{ doc.total.toLocaleString() }}</td>
+                                <td class="p-5 text-center">
+                                    <button @click="openPdf(doc)" class="px-5 py-2 rounded-full text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 transition-all">
+                                        ดู PDF
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredHistory.length === 0">
+                                <td colspan="5" class="p-20 text-center text-slate-300">
+                                    <i class="ph ph-file-dashed text-7xl mb-4"></i>
+                                    <p class="text-lg font-bold">ไม่พบข้อมูลใบเสนอราคา</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: CREATE -->
+        <div v-if="view === 'create'" class="max-w-3xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-8 slide-up">
+            <div class="border-b border-slate-100 pb-4">
+                <h2 class="text-2xl font-bold text-slate-800">สร้างใบเสนอราคาใหม่</h2>
+                <p class="text-slate-400 text-sm">ข้อมูลจะถูกบันทึกและสร้าง PDF ลง Google Drive อัตโนมัติ</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-slate-700 ml-1">ชื่อลูกค้า / บริษัท <span class="text-rose-500">*</span></label>
+                    <input type="text" placeholder="ระบุชื่อลูกค้า..." v-model="customerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-slate-700 ml-1">ชื่อโปรเจกต์ / ชื่องาน</label>
+                    <input type="text" placeholder="ระบุชื่อโปรเจกต์..." v-model="projectName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex justify-between items-center px-1">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-widest text-xs">รายการสินค้าและบริการ</label>
+                    <button @click="addItem" class="text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-xl flex items-center gap-1.5">
+                        <i class="ph ph-plus-circle"></i> เพิ่มรายการ
+                    </button>
+                </div>
+                
+                <div class="space-y-3">
+                    <div v-for="(item, idx) in items" :key="idx" class="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 p-5 rounded-2xl border border-slate-200 relative">
+                        <div class="flex-1 w-full">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-xs font-bold text-slate-400 uppercase">รายละเอียด</label>
+                                <label class="flex items-center gap-2 text-xs font-bold text-slate-500 cursor-pointer">
+                                    <input type="checkbox" v-model="item.isLumpSum" class="rounded text-indigo-600 w-4 h-4">
+                                    ราคาเหมา
+                                </label>
+                            </div>
+                            <input type="text" placeholder="ระบุชื่อรายการ" v-model="item.name" class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="w-full sm:w-28">
+                            <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">{{ item.isLumpSum ? '-' : 'จำนวน' }}</label>
+                            <input type="number" v-model.number="item.qty" :disabled="item.isLumpSum" :class="['w-full p-3 border border-slate-200 rounded-xl text-center outline-none', item.isLumpSum ? 'bg-slate-200 text-slate-400' : 'bg-white focus:ring-2 focus:ring-indigo-500']">
+                        </div>
+                        <div class="w-full sm:w-36">
+                            <label class="block text-xs font-bold text-slate-400 mb-2 uppercase">{{ item.isLumpSum ? 'ราคารวม' : 'ราคา/หน่วย' }}</label>
+                            <input type="number" v-model.number="item.price" class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold">
+                        </div>
+                        <button @click="removeItem(idx)" class="p-3 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
+                            <i class="ph ph-trash text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-bold text-slate-700 ml-1">หมายเหตุและเงื่อนไข (แก้ไขได้)</label>
+                <textarea rows="4" placeholder="ระบุเงื่อนไขการชำระเงิน..." v-model="remark" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm"></textarea>
+            </div>
+
+            <div class="bg-slate-900 text-white p-8 rounded-3xl flex justify-between items-center shadow-xl">
+                <span class="text-slate-400 font-bold uppercase tracking-widest text-xs">ยอดรวมสุทธิ</span>
+                <span class="text-4xl font-black tracking-tighter">฿{{ calculateTotal.toLocaleString() }}</span>
+            </div>
+
+            <div class="flex gap-4 pt-4">
+                <button @click="view = 'home'" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200">ยกเลิก</button>
+                <button @click="submitQuotation" :disabled="loading" class="flex-[2] py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50">
+                    <span v-if="loading" class="flex items-center justify-center gap-2">
+                        <i class="ph ph-circle-notch animate-spin text-xl"></i> กำลังบันทึก...
+                    </span>
+                    <template v-else><i class="ph ph-check-circle text-xl mr-1"></i> ยืนยันและสร้างใบเสนอราคา</template>
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW: SETTINGS -->
+        <div v-if="view === 'settings'" class="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6 slide-up">
+            <div class="text-center">
+                <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                    <i class="ph ph-buildings text-4xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">ตั้งค่าข้อมูลบริษัท</h2>
+                <p class="text-slate-400 text-sm">ข้อมูลนี้จะถูกเก็บไว้ใน Google Sheet ทุกอุปกรณ์จะใช้ข้อมูลเดียวกัน</p>
+            </div>
+            
+            <div class="space-y-5 pt-2">
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อบริษัท / ร้านค้า</label>
+                    <input type="text" v-model="companyInfo.name" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-slate-400 uppercase ml-1">เบอร์โทรศัพท์</label>
+                        <input type="text" v-model="companyInfo.phone" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-slate-400 uppercase ml-1">LINE ID</label>
+                        <input type="text" v-model="companyInfo.lineId" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-indigo-600">
+                    </div>
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">อีเมลติดต่อ</label>
+                    <input type="email" v-model="companyInfo.email" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อผู้เสนอราคา (สำหรับลายเซ็นแบบพิมพ์)</label>
+                    <input type="text" placeholder="ระบุชื่อ-นามสกุล..." v-model="companyInfo.defaultSignerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-indigo-600">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">หมายเหตุเริ่มต้น (Default Remark)</label>
+                    <textarea rows="4" v-model="companyInfo.defaultRemark" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm leading-relaxed"></textarea>
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button @click="saveSettings" :disabled="loading" class="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-black transition-all disabled:opacity-70">
+                    <span v-if="loading" class="animate-pulse">กำลังซิงค์ข้อมูลกับ Sheet...</span>
+                    <template v-else>บันทึกการตั้งค่าลง Sheet</template>
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted } = Vue;
+
+// URL ของ Web App จาก Google Apps Script (ใส่ข้อมูลของคุณกิตเรียบร้อย)
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyOdgzCBWELdmCiU95yrolB8nxOhfuNMge0tuOp4mf9k_VVyx7vKer88SDW-Z9uK4jg/exec";
+
+createApp({
+    setup() {
+        const view = ref('home');
+        const loading = ref(false);
+        const searchQuery = ref('');
+        const notification = ref({ show: false, message: '', type: 'success' });
+
+        const companyInfo = ref({
+            name: '',
+            phone: '',
+            email: '',
+            lineId: '',
+            defaultRemark: '1. เสนอราคานี้ยืนราคา 30 วัน\n2. ชำระมัดจำ 50% ก่อนเริ่มดำเนินการ\n3. ชำระส่วนที่เหลือ 50% ภายใน 7 วันหลังส่งมอบงาน',
+            defaultSignerName: ''
+        });
+
+        const history = ref([]);
+        const customerName = ref('');
+        const projectName = ref('');
+        const remark = ref('');
+        const items = ref([{ name: '', qty: 1, price: 0, isLumpSum: false }]);
+
+        const showMessage = (msg, type = 'success') => {
+            notification.value = { show: true, message: msg, type: type };
+            setTimeout(() => notification.value.show = false, 4000);
+        };
+
+        const filteredHistory = computed(() => {
+            return history.value.filter(h => h.customer.toLowerCase().includes(searchQuery.value.toLowerCase()));
+        });
+
+        const calculateTotal = computed(() => {
+            return items.value.reduce((sum, item) => {
+                const itemTotal = item.isLumpSum ? Number(item.price) : (Number(item.qty) * Number(item.price));
+                return sum + (itemTotal || 0);
+            }, 0);
+        });
+
+        const addItem = () => items.value.push({ name: '', qty: 1, price: 0, isLumpSum: false });
+        const removeItem = (idx) => items.value.splice(idx, 1);
+
+        const saveSettings = async () => {
+            loading.value = true;
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'saveSettings', settings: companyInfo.value }),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    remark.value = companyInfo.value.defaultRemark;
+                    localStorage.setItem('companyInfo', JSON.stringify(companyInfo.value));
+                    showMessage('บันทึกข้อมูลบริษัทเรียบร้อย');
+                    view.value = 'home';
+                }
+            } catch (error) {
+                showMessage('ไม่สามารถซิงค์ข้อมูลได้: ' + error.message, 'error');
+            }
+            loading.value = false;
+        };
+
+        const loadSettingsFromDB = async () => {
+            if (!GAS_URL) return;
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'getSettings' }),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                const result = await response.json();
+                if (result.status === 'success' && result.settings && result.settings.name) {
+                    companyInfo.value = { ...companyInfo.value, ...result.settings };
+                    remark.value = companyInfo.value.defaultRemark;
+                    localStorage.setItem('companyInfo', JSON.stringify(companyInfo.value));
+                } else {
+                    const localData = localStorage.getItem('companyInfo');
+                    if(localData) {
+                        companyInfo.value = JSON.parse(localData);
+                        remark.value = companyInfo.value.defaultRemark;
+                    }
+                }
+            } catch (e) {
+                console.log('Using local fallback.');
+            }
+        };
+
+        const openPdf = (doc) => {
+            if (doc.link && doc.link !== '#') window.open(doc.link, '_blank');
+            else showMessage('ลิงก์เอกสารไม่พร้อมใช้งาน', 'error');
+        };
+
+        const submitQuotation = async () => {
+            if (!customerName.value) return showMessage('กรุณากรอกชื่อลูกค้า', 'error');
+            if (items.value.some(i => !i.name || i.price <= 0)) return showMessage('กรุณากรอกรายการและราคาให้ถูกต้อง', 'error');
+            
+            loading.value = true;
+            const payload = {
+                action: 'createQuotation',
+                company: companyInfo.value,
+                customer: customerName.value,
+                projectName: projectName.value,
+                remark: remark.value,
+                items: items.value,
+                total: calculateTotal.value
+            };
+
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                const result = await response.json();
+                
+                if(result.status === 'success') {
+                    showMessage('สำเร็จ! สร้าง PDF และบันทึกประวัติแล้ว');
+                    history.value.unshift({ 
+                        customer: customerName.value, 
+                        projectName: projectName.value,
+                        date: new Date().toLocaleDateString('th-TH'), 
+                        total: calculateTotal.value,
+                        link: result.url
+                    });
+                    
+                    view.value = 'home';
+                    customerName.value = ''; 
+                    projectName.value = '';
+                    items.value = [{ name: '', qty: 1, price: 0, isLumpSum: false }];
+                    remark.value = companyInfo.value.defaultRemark;
+                } else {
+                    showMessage('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: ' + result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('เกิดข้อผิดพลาด: ' + error.message, 'error');
+            }
+            loading.value = false;
+        };
+
+        onMounted(() => {
+            loadSettingsFromDB();
+        });
+
+        return {
+            view, loading, searchQuery, notification, companyInfo, history,
+            customerName, projectName, remark, items,
+            filteredHistory, calculateTotal,
+            addItem, removeItem, saveSettings, openPdf, submitQuotation
+        };
+    }
+}).mount('#app');
+</script>
+
+</body>
+</html>
