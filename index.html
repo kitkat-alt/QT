@@ -1,0 +1,195 @@
+/**
+ * ระบบ Backend สำหรับจัดการใบเสนอราคา
+ * จัดการโดย: กิต โซลูชั่น จำกัด
+ */
+
+const FOLDER_ID = "1OZDzFqsQ_55Xipuyi5uxxpmVqGBylML1"; // โฟลเดอร์หลักใน Google Drive สำหรับเก็บใบเสนอราคา
+const SHEET_NAME = "History"; 
+const SETTINGS_SHEET_NAME = "Settings";
+
+/**
+ * รับค่าจาก Frontend (index.html)
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    
+    // 1. สร้างใบเสนอราคาและบันทึก PDF
+    if (data.action === 'createQuotation') {
+      const pdfUrl = generatePDFAndSave(data);
+      saveToSheet(data, pdfUrl);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', url: pdfUrl })).setMimeType(ContentService.MimeType.JSON);
+    } 
+    // 2. บันทึกการตั้งค่าบริษัทลง Sheet
+    else if (data.action === 'saveSettings') {
+      saveCompanySettings(data.settings);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success' })).setMimeType(ContentService.MimeType.JSON);
+    } 
+    // 3. ดึงการตั้งค่าบริษัทจาก Sheet
+    else if (data.action === 'getSettings') {
+      const settings = getCompanySettings();
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', settings: settings })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'ไม่พบคำสั่งที่ต้องการ' })).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * บันทึกการตั้งค่าลง Sheet (Settings)
+ */
+function saveCompanySettings(settings) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME) || ss.insertSheet(SETTINGS_SHEET_NAME);
+  sheet.clear();
+  const dataToSave = [
+    ["key", "value"],
+    ["name", settings.name || ""],
+    ["phone", settings.phone || ""],
+    ["email", settings.email || ""],
+    ["lineId", settings.lineId || ""],
+    ["defaultRemark", settings.defaultRemark || ""],
+    ["defaultSignerName", settings.defaultSignerName || ""]
+  ];
+  sheet.getRange(1, 1, dataToSave.length, 2).setValues(dataToSave);
+}
+
+/**
+ * ดึงการตั้งค่าจาก Sheet (Settings)
+ */
+function getCompanySettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (!sheet) return null;
+  
+  const data = sheet.getDataRange().getValues();
+  let settings = {};
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) settings[data[i][0]] = String(data[i][1]);
+  }
+  return settings;
+}
+
+/**
+ * สร้าง PDF และบันทึกลงโฟลเดอร์ลูกค้า
+ */
+function generatePDFAndSave(data) {
+  const rootFolder = DriveApp.getFolderById(FOLDER_ID);
+  
+  // ค้นหาหรือสร้างโฟลเดอร์ย่อยตามชื่อลูกค้า
+  let customerFolders = rootFolder.searchFolders(`title = '${data.customer}'`);
+  let customerFolder = customerFolders.hasNext() ? customerFolders.next() : rootFolder.createFolder(data.customer);
+  
+  // สร้างโครงสร้าง HTML สำหรับ PDF
+  let html = `
+    <div style="font-family: 'Sarabun', sans-serif; padding: 20px; line-height: 1.6;">
+      <h1 style="color: #4f46e5; text-align: center;">ใบเสนอราคา (Quotation)</h1>
+      <table style="width: 100%; margin-bottom: 20px;">
+        <tr>
+          <td style="vertical-align: top; width: 50%;">
+            <strong>ผู้เสนอราคา:</strong><br>
+            ${data.company.name}<br>
+            โทร: ${data.company.phone}<br>
+            ${data.company.email ? 'อีเมล: ' + data.company.email : ''}
+            ${data.company.lineId ? '<br>LINE: ' + data.company.lineId : ''}
+          </td>
+          <td style="text-align: right; vertical-align: top; width: 50%;">
+            <strong>วันที่:</strong> ${new Date().toLocaleDateString('th-TH')}<br>
+            <strong>ลูกค้า:</strong> ${data.customer}<br>
+            ${data.projectName ? '<strong>โครงการ:</strong> ' + data.projectName : ''}
+          </td>
+        </tr>
+      </table>
+      
+      <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+        <thead style="background-color: #f8fafc;">
+          <tr>
+            <th style="text-align: center;">ลำดับ</th>
+            <th>รายการสินค้า/บริการ</th>
+            <th style="width: 80px; text-align: center;">จำนวน</th>
+            <th style="width: 120px; text-align: right;">ราคา/หน่วย</th>
+            <th style="width: 120px; text-align: right;">รวมเป็นเงิน</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  data.items.forEach((item, index) => {
+    const qtyText = item.isLumpSum ? '-' : item.qty;
+    const priceText = item.isLumpSum ? '-' : item.price.toLocaleString();
+    const itemTotal = item.isLumpSum ? item.price : (item.qty * item.price);
+    
+    html += `
+      <tr>
+        <td style="text-align: center;">${index + 1}</td>
+        <td>${item.name} ${item.isLumpSum ? '(ราคาเหมา)' : ''}</td>
+        <td style="text-align: center;">${qtyText}</td>
+        <td style="text-align: right;">${priceText}</td>
+        <td style="text-align: right;">${itemTotal.toLocaleString()}</td>
+      </tr>
+    `;
+  });
+  
+  html += `
+        </tbody>
+      </table>
+      
+      <div style="margin-top: 20px;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="vertical-align: top; width: 60%;">
+              <strong>หมายเหตุ / เงื่อนไข:</strong><br>
+              <div style="white-space: pre-wrap; font-size: 13px; color: #475569; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;">${data.remark || '-'}</div>
+            </td>
+            <td style="text-align: right; vertical-align: top;">
+              <h2 style="color: #4f46e5; margin: 0;">ยอดรวมสุทธิ: ${data.total.toLocaleString()} บาท</h2>
+              <p style="font-size: 12px; color: #94a3b8;">(ภาษีมูลค่าเพิ่ม 0%)</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+      
+      <div style="margin-top: 60px;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="text-align: center; width: 50%;">
+              <div style="height: 40px; border-bottom: 1px solid #000; width: 180px; margin: 0 auto; font-weight: bold; font-size: 18px; display: flex; align-items: flex-end; justify-content: center;">
+                ${data.company.defaultSignerName || ''}
+              </div>
+              <p style="margin-top: 5px;">ผู้เสนอราคา</p>
+            </td>
+            <td style="text-align: center; width: 50%;">
+              <div style="height: 40px; border-bottom: 1px solid #000; width: 180px; margin: 0 auto;"></div>
+              <p style="margin-top: 5px;">ผู้อนุมัติ / ลูกค้า</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  `;
+  
+  // แปลง HTML เป็น PDF และบันทึก
+  const blob = HtmlService.createHtmlOutput(html).getAs('application/pdf').setName(`ใบเสนอราคา_${data.customer}_${new Date().getTime()}.pdf`);
+  const file = customerFolder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  
+  return file.getUrl();
+}
+
+/**
+ * บันทึกประวัติการสร้างลง Sheet (History)
+ */
+function saveToSheet(data, pdfUrl) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["วันที่", "ลูกค้า", "โครงการ", "ยอดรวม", "ลิงก์ PDF"]);
+  }
+  sheet.appendRow([new Date(), data.customer, data.projectName || '-', data.total, pdfUrl]);
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput("ระบบทำงานปกติ").setMimeType(ContentService.MimeType.TEXT);
+}
