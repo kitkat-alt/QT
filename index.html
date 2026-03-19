@@ -26,7 +26,7 @@
 <body class="bg-slate-50 text-slate-800 selection:bg-indigo-100">
 
 <div id="app" v-cloak>
-    <!-- Message Box (Custom Alert) -->
+    <!-- Message Box -->
     <div v-if="notification.show" class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4 slide-up">
         <div :class="['p-4 rounded-2xl shadow-2xl border flex items-center gap-3', notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800']">
             <i :class="['ph-bold text-2xl', notification.type === 'success' ? 'ph-check-circle' : 'ph-warning-circle']"></i>
@@ -60,20 +60,26 @@
             <div class="flex flex-col sm:flex-row justify-between gap-4 items-center">
                 <div class="relative w-full sm:w-96">
                     <i class="ph ph-magnifying-glass absolute left-4 top-3.5 text-slate-400 text-lg"></i>
-                    <input type="text" placeholder="ค้นหาชื่อลูกค้า..." v-model="searchQuery" class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <!-- ค้นหาได้ทั้งลูกค้าและโครงการ -->
+                    <input type="text" placeholder="ค้นหาชื่อลูกค้า, โครงการ..." v-model="searchQuery" class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <button @click="view = 'create'" class="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-indigo-200 hover:shadow-lg hover:-translate-y-0.5 transition-all font-bold">
                     <i class="ph ph-plus text-xl"></i> สร้างใบเสนอราคา
                 </button>
             </div>
 
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden relative">
+                <!-- โหลดแสดงตอนดึงประวัติ -->
+                <div v-if="loadingHistory" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-indigo-600">
+                    <i class="ph ph-spinner-gap animate-spin text-4xl mb-2"></i>
+                    <p class="font-bold">กำลังโหลดประวัติ...</p>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-slate-50/50 border-b border-slate-100 text-slate-500 text-xs uppercase tracking-widest font-bold">
-                                <th class="p-5">ชื่อลูกค้า / บริษัท</th>
-                                <th class="p-5">โครงการ</th>
+                                <th class="p-5">ลูกค้า / โครงการ</th> <!-- รวมคอลัมน์ -->
                                 <th class="p-5">วันที่</th>
                                 <th class="p-5 text-right">ยอดรวม</th>
                                 <th class="p-5 text-center">จัดการ</th>
@@ -81,8 +87,10 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="(doc, idx) in filteredHistory" :key="idx" class="hover:bg-slate-50 transition-colors">
-                                <td class="p-5 font-bold text-slate-800">{{ doc.customer }}</td>
-                                <td class="p-5 text-sm text-slate-500">{{ doc.projectName || '-' }}</td>
+                                <td class="p-5">
+                                    <p class="font-bold text-slate-800">{{ doc.customer }}</p>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{{ doc.projectName || 'ไม่ระบุโครงการ' }}</p>
+                                </td>
                                 <td class="p-5 text-sm text-slate-500">{{ doc.date }}</td>
                                 <td class="p-5 text-right font-black text-indigo-600 text-lg">฿{{ doc.total.toLocaleString() }}</td>
                                 <td class="p-5 text-center">
@@ -91,8 +99,8 @@
                                     </button>
                                 </td>
                             </tr>
-                            <tr v-if="filteredHistory.length === 0">
-                                <td colspan="5" class="p-20 text-center text-slate-300">
+                            <tr v-if="filteredHistory.length === 0 && !loadingHistory">
+                                <td colspan="4" class="p-20 text-center text-slate-300">
                                     <i class="ph ph-file-dashed text-7xl mb-4"></i>
                                     <p class="text-lg font-bold">ไม่พบข้อมูลใบเสนอราคา</p>
                                 </td>
@@ -184,7 +192,7 @@
                     <i class="ph ph-buildings text-4xl"></i>
                 </div>
                 <h2 class="text-2xl font-bold text-slate-800">ตั้งค่าข้อมูลบริษัท</h2>
-                <p class="text-slate-400 text-sm">ข้อมูลนี้จะถูกเก็บไว้ใน Google Sheet ทุกอุปกรณ์จะใช้ข้อมูลเดียวกัน</p>
+                <p class="text-slate-400 text-sm">ข้อมูลนี้จะถูกเก็บไว้ในระบบคลาวด์อัตโนมัติ</p>
             </div>
             
             <div class="space-y-5 pt-2">
@@ -207,7 +215,7 @@
                     <input type="email" v-model="companyInfo.email" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold">
                 </div>
                 <div class="space-y-1.5">
-                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อผู้เสนอราคา (สำหรับลายเซ็นแบบพิมพ์)</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase ml-1">ชื่อผู้เสนอราคา (แสดงใต้ลายเซ็น)</label>
                     <input type="text" placeholder="ระบุชื่อ-นามสกุล..." v-model="companyInfo.defaultSignerName" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-indigo-600">
                 </div>
                 <div class="space-y-1.5">
@@ -218,8 +226,8 @@
 
             <div class="pt-4">
                 <button @click="saveSettings" :disabled="loading" class="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl hover:bg-black transition-all disabled:opacity-70">
-                    <span v-if="loading" class="animate-pulse">กำลังซิงค์ข้อมูลกับ Sheet...</span>
-                    <template v-else>บันทึกการตั้งค่าลง Sheet</template>
+                    <span v-if="loading" class="animate-pulse">กำลังบันทึกข้อมูล...</span>
+                    <template v-else>บันทึกการตั้งค่า</template>
                 </button>
             </div>
         </div>
@@ -229,21 +237,19 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 
-// URL ของ Web App จาก Google Apps Script (ใส่ข้อมูลของคุณกิตเรียบร้อย)
+// 🟢 ใส่ URL ของ GAS ที่เพิ่ง Deploy ใหม่ตรงนี้ครับ 🟢
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyOdgzCBWELdmCiU95yrolB8nxOhfuNMge0tuOp4mf9k_VVyx7vKer88SDW-Z9uK4jg/exec";
 
 createApp({
     setup() {
         const view = ref('home');
         const loading = ref(false);
+        const loadingHistory = ref(true);
         const searchQuery = ref('');
         const notification = ref({ show: false, message: '', type: 'success' });
 
         const companyInfo = ref({
-            name: '',
-            phone: '',
-            email: '',
-            lineId: '',
+            name: '', phone: '', email: '', lineId: '',
             defaultRemark: '1. เสนอราคานี้ยืนราคา 30 วัน\n2. ชำระมัดจำ 50% ก่อนเริ่มดำเนินการ\n3. ชำระส่วนที่เหลือ 50% ภายใน 7 วันหลังส่งมอบงาน',
             defaultSignerName: ''
         });
@@ -259,8 +265,13 @@ createApp({
             setTimeout(() => notification.value.show = false, 4000);
         };
 
+        // ค้นหาบางส่วน ทั้งชื่อลูกค้าและโครงการ
         const filteredHistory = computed(() => {
-            return history.value.filter(h => h.customer.toLowerCase().includes(searchQuery.value.toLowerCase()));
+            const q = searchQuery.value.toLowerCase();
+            return history.value.filter(h => 
+                (h.customer && h.customer.toLowerCase().includes(q)) || 
+                (h.projectName && h.projectName.toLowerCase().includes(q))
+            );
         });
 
         const calculateTotal = computed(() => {
@@ -284,44 +295,43 @@ createApp({
                 const result = await response.json();
                 if (result.status === 'success') {
                     remark.value = companyInfo.value.defaultRemark;
-                    localStorage.setItem('companyInfo', JSON.stringify(companyInfo.value));
-                    showMessage('บันทึกข้อมูลบริษัทเรียบร้อย');
+                    showMessage('บันทึกข้อมูลเรียบร้อย ระบบจะจำค่านี้ไว้ใช้งานตลอด');
                     view.value = 'home';
                 }
             } catch (error) {
-                showMessage('ไม่สามารถซิงค์ข้อมูลได้: ' + error.message, 'error');
+                showMessage('เกิดข้อผิดพลาด: ' + error.message, 'error');
             }
             loading.value = false;
         };
 
-        const loadSettingsFromDB = async () => {
-            if (!GAS_URL) return;
+        // โหลดประวัติและการตั้งค่าแบบรวดเดียว
+        const loadInitialData = async () => {
+            if (!GAS_URL) { loadingHistory.value = false; return; }
             try {
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ action: 'getSettings' }),
+                    body: JSON.stringify({ action: 'getInitialData' }),
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                 });
                 const result = await response.json();
-                if (result.status === 'success' && result.settings && result.settings.name) {
-                    companyInfo.value = { ...companyInfo.value, ...result.settings };
-                    remark.value = companyInfo.value.defaultRemark;
-                    localStorage.setItem('companyInfo', JSON.stringify(companyInfo.value));
-                } else {
-                    const localData = localStorage.getItem('companyInfo');
-                    if(localData) {
-                        companyInfo.value = JSON.parse(localData);
+                if (result.status === 'success') {
+                    if (result.settings && result.settings.name) {
+                        companyInfo.value = { ...companyInfo.value, ...result.settings };
                         remark.value = companyInfo.value.defaultRemark;
+                    }
+                    if (result.history) {
+                        history.value = result.history;
                     }
                 }
             } catch (e) {
-                console.log('Using local fallback.');
+                console.log('Error loading initial data');
             }
+            loadingHistory.value = false;
         };
 
         const openPdf = (doc) => {
             if (doc.link && doc.link !== '#') window.open(doc.link, '_blank');
-            else showMessage('ลิงก์เอกสารไม่พร้อมใช้งาน', 'error');
+            else showMessage('ไม่พบลิงก์เอกสาร PDF', 'error');
         };
 
         const submitQuotation = async () => {
@@ -348,7 +358,8 @@ createApp({
                 const result = await response.json();
                 
                 if(result.status === 'success') {
-                    showMessage('สำเร็จ! สร้าง PDF และบันทึกประวัติแล้ว');
+                    showMessage('สร้างสำเร็จ! บันทึกเอกสาร PDF แล้ว');
+                    // อัปเดตตารางหน้าเว็บทันที ไม่ต้องรีเฟรช
                     history.value.unshift({ 
                         customer: customerName.value, 
                         projectName: projectName.value,
@@ -363,20 +374,20 @@ createApp({
                     items.value = [{ name: '', qty: 1, price: 0, isLumpSum: false }];
                     remark.value = companyInfo.value.defaultRemark;
                 } else {
-                    showMessage('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: ' + result.message, 'error');
+                    showMessage('ข้อผิดพลาด: ' + result.message, 'error');
                 }
             } catch (error) {
-                showMessage('เกิดข้อผิดพลาด: ' + error.message, 'error');
+                showMessage('เกิดข้อผิดพลาดในการสร้างเอกสาร', 'error');
             }
             loading.value = false;
         };
 
         onMounted(() => {
-            loadSettingsFromDB();
+            loadInitialData(); // เรียกใช้งานเมื่อเปิดเว็บ
         });
 
         return {
-            view, loading, searchQuery, notification, companyInfo, history,
+            view, loading, loadingHistory, searchQuery, notification, companyInfo, history,
             customerName, projectName, remark, items,
             filteredHistory, calculateTotal,
             addItem, removeItem, saveSettings, openPdf, submitQuotation
