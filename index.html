@@ -2,9 +2,41 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>QT by กิต โซลูชั่น จำกัด</title>
     
+    <!-- PWA / Web App Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="manifest" id="manifest-placeholder">
+    
+    <!-- PWA Setup Script -->
+    <script>
+      const manifestObj = {
+        "name": "Quotation App",
+        "short_name": "QT App",
+        "start_url": ".",
+        "display": "standalone",
+        "background_color": "#f8fafc",
+        "theme_color": "#4f46e5",
+        "icons": [{
+          "src": "https://cdn-icons-png.flaticon.com/512/2921/2921222.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }]
+      };
+      const manifestData = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifestObj));
+      document.getElementById('manifest-placeholder').setAttribute('href', manifestData);
+      
+      // Minimal Service Worker to trigger Install Prompt
+      if ('serviceWorker' in navigator) {
+        const swCode = "self.addEventListener('fetch', function(e) {});";
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW Setup Error:', err));
+      }
+    </script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -16,14 +48,14 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'Sarabun', sans-serif; -webkit-tap-highlight-color: transparent; }
         [v-cloak] { display: none; }
         
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .slide-up { animation: slideUp 0.4s ease-out; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 selection:bg-indigo-100">
+<body class="bg-slate-50 text-slate-800 selection:bg-indigo-100 pb-10">
 
 <div id="app" v-cloak>
     <!-- Message Box -->
@@ -40,7 +72,7 @@
         <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-extrabold flex items-center gap-2 cursor-pointer bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600" @click="view = 'home'">
                 <i class="ph ph-file-text text-indigo-600 text-3xl"></i>
-                QT by กิต โซลูชั่น จำกัด
+                QT App
             </h1>
             <div class="flex gap-2">
                 <button @click="view = 'home'" :class="['p-2.5 rounded-xl transition-all text-xl', view === 'home' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600']">
@@ -68,9 +100,9 @@
             </div>
 
             <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden relative">
-                <div v-if="loadingHistory" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-indigo-600">
-                    <i class="ph ph-spinner-gap animate-spin text-4xl mb-2"></i>
-                    <p class="font-bold">กำลังโหลดประวัติ...</p>
+                <!-- สัญลักษณ์โหลดข้อมูลแอบโชว์เบาๆ มุมขวาบน -->
+                <div v-if="isSyncing" class="absolute top-3 right-4 flex items-center gap-1.5 text-xs font-bold text-indigo-500">
+                    <i class="ph ph-arrows-clockwise animate-spin"></i> ซิงค์ข้อมูล...
                 </div>
 
                 <div class="overflow-x-auto">
@@ -87,7 +119,6 @@
                                     <p class="font-bold text-slate-800">{{ doc.customer }}</p>
                                     <p class="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{{ doc.projectName || '-' }}</p>
                                 </td>
-                                <!-- คอลัมน์ยอดรวม กดเพื่อดู PDF และมีวันที่ด้านล่าง -->
                                 <td class="p-5 text-right cursor-pointer group" @click="openPdf(doc)">
                                     <div class="inline-block px-4 py-2 rounded-xl group-hover:bg-indigo-50 transition-colors text-right border border-transparent group-hover:border-indigo-100">
                                         <p class="font-black text-indigo-600 text-lg">฿{{ doc.total.toLocaleString() }} <i class="ph ph-file-pdf ml-1"></i></p>
@@ -101,6 +132,12 @@
                                     <p class="text-lg font-bold">ไม่พบข้อมูลใบเสนอราคา</p>
                                 </td>
                             </tr>
+                            <tr v-if="loadingHistory && filteredHistory.length === 0">
+                                <td colspan="2" class="p-20 text-center text-indigo-400">
+                                    <i class="ph ph-spinner-gap animate-spin text-4xl mb-2"></i>
+                                    <p class="font-bold">กำลังโหลดข้อมูลครั้งแรก...</p>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -108,7 +145,7 @@
         </div>
 
         <!-- VIEW: CREATE -->
-        <div v-if="view === 'create'" class="max-w-3xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-8 slide-up">
+        <div v-if="view === 'create'" class="max-w-3xl mx-auto bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 space-y-8 slide-up">
             <div class="border-b border-slate-100 pb-4">
                 <h2 class="text-2xl font-bold text-slate-800">สร้างใบเสนอราคาใหม่</h2>
                 <p class="text-slate-400 text-sm">ข้อมูลจะถูกบันทึกและสร้าง PDF ลง Google Drive อัตโนมัติ</p>
@@ -155,7 +192,6 @@
                         </button>
                     </div>
 
-                    <!-- ปรับตำแหน่งปุ่มเพิ่มรายการมาไว้ด้านล่าง -->
                     <button @click="addItem" class="w-full py-4 border-2 border-dashed border-slate-200 text-slate-500 rounded-2xl hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 font-bold transition-all flex justify-center items-center gap-2 mt-2">
                         <i class="ph ph-plus-circle text-xl"></i> เพิ่มรายการสินค้า/บริการ
                     </button>
@@ -167,12 +203,12 @@
                 <textarea rows="4" placeholder="ระบุเงื่อนไขการชำระเงิน..." v-model="remark" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none text-sm"></textarea>
             </div>
 
-            <div class="bg-slate-900 text-white p-8 rounded-3xl flex justify-between items-center shadow-xl">
+            <div class="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-xl">
                 <span class="text-slate-400 font-bold uppercase tracking-widest text-xs">ยอดรวมสุทธิ</span>
                 <span class="text-4xl font-black tracking-tighter">฿{{ calculateTotal.toLocaleString() }}</span>
             </div>
 
-            <div class="flex gap-4 pt-4">
+            <div class="flex flex-col sm:flex-row gap-4 pt-4">
                 <button @click="view = 'home'" class="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200">ยกเลิก</button>
                 <button @click="submitQuotation" :disabled="loading" class="flex-[2] py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50">
                     <span v-if="loading" class="flex items-center justify-center gap-2">
@@ -184,7 +220,7 @@
         </div>
 
         <!-- VIEW: SETTINGS -->
-        <div v-if="view === 'settings'" class="max-w-md mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6 slide-up">
+        <div v-if="view === 'settings'" class="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6 slide-up">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-4">
@@ -193,7 +229,6 @@
                     <h2 class="text-2xl font-bold text-slate-800">ตั้งค่าข้อมูลบริษัท</h2>
                     <p class="text-slate-400 text-sm mt-1">ข้อมูลคลาวด์ใช้ร่วมกันทุกอุปกรณ์</p>
                 </div>
-                <!-- ปุ่มสลับโหมดแก้ไข -->
                 <button v-if="!isEditingSettings" @click="isEditingSettings = true" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors flex items-center gap-2">
                     <i class="ph ph-pencil-simple"></i> แก้ไข
                 </button>
@@ -242,7 +277,6 @@
 <script>
 const { createApp, ref, computed, onMounted } = Vue;
 
-// 🟢 วาง URL ใหม่ตรงนี้ 🟢
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyOdgzCBWELdmCiU95yrolB8nxOhfuNMge0tuOp4mf9k_VVyx7vKer88SDW-Z9uK4jg/exec";
 
 createApp({
@@ -250,7 +284,8 @@ createApp({
         const view = ref('home');
         const loading = ref(false);
         const loadingHistory = ref(true);
-        const isEditingSettings = ref(false); // สถานะเปิด/ปิดการแก้ไขตั้งค่า
+        const isSyncing = ref(false);
+        const isEditingSettings = ref(false);
         const searchQuery = ref('');
         const notification = ref({ show: false, message: '', type: 'success' });
 
@@ -291,7 +326,6 @@ createApp({
 
         const cancelEditSettings = () => {
             isEditingSettings.value = false;
-            // โหลดคืนค่าเดิมจาก localStorage ถ้ากดยกเลิก
             const localData = localStorage.getItem('companyInfo');
             if(localData) companyInfo.value = JSON.parse(localData);
         };
@@ -318,7 +352,23 @@ createApp({
         };
 
         const loadInitialData = async () => {
+            // 1. โหลดข้อมูลจาก LocalStorage ทันที เพื่อให้แสดงผลลื่นไหลไม่ต้องรอ
+            const localHistory = localStorage.getItem('qt_history');
+            if (localHistory) {
+                history.value = JSON.parse(localHistory);
+                loadingHistory.value = false;
+            }
+            
+            const localSettings = localStorage.getItem('companyInfo');
+            if (localSettings) {
+                companyInfo.value = JSON.parse(localSettings);
+                remark.value = companyInfo.value.defaultRemark;
+            }
+
             if (!GAS_URL) { loadingHistory.value = false; return; }
+
+            // 2. แอบไปซิงค์ข้อมูลใหม่จาก Sheet เพื่ออัปเดตเบื้องหลัง
+            isSyncing.value = true;
             try {
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
@@ -334,13 +384,14 @@ createApp({
                     }
                     if (result.history) {
                         history.value = result.history;
+                        localStorage.setItem('qt_history', JSON.stringify(result.history)); // เซฟประวัติใหม่ลงเครื่อง
                     }
                 }
             } catch (e) {
-                const localData = localStorage.getItem('companyInfo');
-                if(localData) companyInfo.value = JSON.parse(localData);
+                console.log('Using local fallback (Offline mode)');
             }
             loadingHistory.value = false;
+            isSyncing.value = false;
         };
 
         const openPdf = (doc) => {
@@ -373,6 +424,7 @@ createApp({
                 
                 if(result.status === 'success') {
                     showMessage('สร้างสำเร็จ! บันทึกเอกสาร PDF แล้ว');
+                    
                     history.value.unshift({ 
                         customer: customerName.value, 
                         projectName: projectName.value,
@@ -381,7 +433,9 @@ createApp({
                         link: result.url
                     });
                     
-                    // เคลียร์ฟอร์มทุกครั้งหลังสร้างเสร็จ (ข้อ 4)
+                    // อัปเดตข้อมูลลง LocalStorage ทันที
+                    localStorage.setItem('qt_history', JSON.stringify(history.value));
+                    
                     customerName.value = ''; 
                     projectName.value = '';
                     items.value = [{ name: '', qty: 1, price: 0, isLumpSum: false }];
@@ -402,7 +456,7 @@ createApp({
         });
 
         return {
-            view, loading, loadingHistory, isEditingSettings, searchQuery, notification, companyInfo, history,
+            view, loading, loadingHistory, isSyncing, isEditingSettings, searchQuery, notification, companyInfo, history,
             customerName, projectName, remark, items,
             filteredHistory, calculateTotal,
             addItem, removeItem, cancelEditSettings, saveSettings, openPdf, submitQuotation
