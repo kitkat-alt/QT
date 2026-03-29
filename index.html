@@ -1,5 +1,60 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Settings, ChevronLeft, FileText, CheckCircle, Trash2, Home, Share, ExternalLink, Printer, X, Edit, Upload, Save, ChevronRight, AlertCircle, CreditCard, EyeOff, Edit3 } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Preview App</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>body { margin: 0; padding: 0; background-color: #F5F5F7; }</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    
+    // Fallback Icons Helper
+    const IconHelper = ({ name, size = 24, className = "" }) => {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (ref.current && window.lucide) {
+           const iconData = window.lucide.icons[name];
+           if (iconData) {
+             lucide.createIcons({
+                icons: { [name]: iconData },
+                nameAttr: 'data-lucide',
+                root: ref.current.parentElement
+             });
+           }
+        }
+      }, [name]);
+      return <i data-lucide={name.replace(/[A-Z]/g, m => "-" + m.toLowerCase()).replace(/^-/, '')} className={className} style={{ width: size, height: size, display: 'inline-block' }}></i>;
+    };
+
+    const Search = (p) => <IconHelper name="Search" {...p} />;
+    const Plus = (p) => <IconHelper name="Plus" {...p} />;
+    const Settings = (p) => <IconHelper name="Settings" {...p} />;
+    const ChevronLeft = (p) => <IconHelper name="ChevronLeft" {...p} />;
+    const FileText = (p) => <IconHelper name="FileText" {...p} />;
+    const CheckCircle = (p) => <IconHelper name="CheckCircle" {...p} />;
+    const Trash2 = (p) => <IconHelper name="Trash2" {...p} />;
+    const Home = (p) => <IconHelper name="Home" {...p} />;
+    const Share = (p) => <IconHelper name="Share" {...p} />;
+    const ExternalLink = (p) => <IconHelper name="ExternalLink" {...p} />;
+    const Printer = (p) => <IconHelper name="Printer" {...p} />;
+    const X = (p) => <IconHelper name="X" {...p} />;
+    const Edit = (p) => <IconHelper name="Edit" {...p} />;
+    const Upload = (p) => <IconHelper name="Upload" {...p} />;
+    const Save = (p) => <IconHelper name="Save" {...p} />;
+    const ChevronRight = (p) => <IconHelper name="ChevronRight" {...p} />;
+    const AlertCircle = (p) => <IconHelper name="AlertCircle" {...p} />;
+    const CreditCard = (p) => <IconHelper name="CreditCard" {...p} />;
+    const EyeOff = (p) => <IconHelper name="EyeOff" {...p} />;
+    const Edit3 = (p) => <IconHelper name="Edit3" {...p} />;
+
 
 // URL สำหรับเชื่อมต่อกับ Google Apps Script (GAS)
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOdgzCBWELdmCiU95yrolB8nxOhfuNMge0tuOp4mf9k_VVyx7vKer88SDW-Z9uK4jg/exec";
@@ -84,7 +139,7 @@ const SwipeableRow = ({ children, onSwipeLeft, onSwipeRight, onClick, showTrash 
   );
 };
 
-export default function App() {
+function App() {
   const [view, setView] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -287,8 +342,7 @@ export default function App() {
       items: [{ name: '', qty: 1, price: '', isLumpSum: false }],
       discount: '',
       vatType: 'none',
-      remark: companySettings.defaultRemark !== undefined ? companySettings.defaultRemark : 'ชำระเงินภายใน 7 วัน\nกรณีเช็คสั่งจ่ายในนามบริษัทฯ เท่านั้น',
-      isCustomRemark: false
+      remark: companySettings.defaultRemark
     });
     setView('form');
   };
@@ -415,7 +469,7 @@ export default function App() {
               <span className="text-gray-400 font-bold text-right">เลขที่ / No:</span>
               <span className="font-bold">{currentDoc?.id}</span>
               <span className="text-gray-400 font-bold text-right">วันที่ / Date:</span>
-              <span className="font-bold">{String(currentDoc?.date || '').split('T')[0]}</span>
+              <span className="font-bold">{currentDoc?.date}</span>
             </div>
           </div>
         </div>
@@ -753,18 +807,10 @@ export default function App() {
                   <h3 className="text-[14px] font-semibold text-slate-900">ข้อมูลติดต่อ</h3>
               </div>
               <div className="divide-y divide-slate-100">
-                  {[{k: 'name', l: 'ชื่อบริษัท'}, {k: 'phone', l: 'เบอร์โทร'}, {k: 'lineId', l: 'Line ID'}, {k: 'address', l: 'ที่อยู่'}, {k: 'defaultRemark', l: 'หมายเหตุเริ่มต้น'}].map((field) => (
-                    <div key={field.k} className="flex flex-col sm:flex-row sm:items-start px-6 py-4">
-                      <span className="text-slate-500 font-medium text-[14px] sm:w-1/3 mb-2 sm:mb-0 sm:mt-2">{field.l}</span>
-                      <div className="sm:w-2/3 flex w-full">
-                        {isEditingSettings ? (
-                            field.k === 'address' || field.k === 'defaultRemark' ? 
-                            <textarea className="w-full font-medium outline-none text-slate-900 bg-slate-50 border border-slate-200 rounded px-3 py-2 text-[14px] focus:border-indigo-500 focus:bg-white transition-colors min-h-[80px]" value={companySettings[field.k]||''} onChange={e => setCompanySettings({...companySettings, [field.k]: e.target.value})} placeholder={`กรอก${field.l}`} /> :
-                            <input className="w-full font-medium outline-none text-slate-900 bg-slate-50 border border-slate-200 rounded px-3 py-2 text-[14px] focus:border-indigo-500 focus:bg-white transition-colors" value={companySettings[field.k]||''} onChange={e => setCompanySettings({...companySettings, [field.k]: e.target.value})} placeholder={`กรอก${field.l}`} /> 
-                        ) : (
-                            <p className={`font-semibold text-slate-900 text-[14px] ${field.k === 'address' || field.k === 'defaultRemark' ? 'whitespace-pre-wrap' : 'truncate'}`}>{companySettings[field.k]||'-'}</p>
-                        )}
-                      </div>
+                  {[{k: 'name', l: 'ชื่อบริษัท'}, {k: 'phone', l: 'เบอร์โทร'}, {k: 'lineId', l: 'Line ID'}, {k: 'address', l: 'ที่อยู่'}].map((field) => (
+                    <div key={field.k} className="flex flex-col sm:flex-row sm:items-center px-6 py-4">
+                      <span className="text-slate-500 font-medium text-[14px] sm:w-1/3 mb-1 sm:mb-0">{field.l}</span>
+                      {isEditingSettings ? <input className="sm:w-2/3 font-medium outline-none text-slate-900 bg-slate-50 border border-slate-200 rounded absolute-right hidden-search px-3 py-2 text-[14px] focus:border-indigo-500 focus:bg-white transition-colors" value={companySettings[field.k]||''} onChange={e => setCompanySettings({...companySettings, [field.k]: e.target.value})} placeholder={`กรอก${field.l}`} /> : <p className="font-semibold text-slate-900 truncate sm:w-2/3 text-[14px]">{companySettings[field.k]||'-'}</p>}
                     </div>
                   ))}
               </div>
@@ -896,3 +942,10 @@ export default function App() {
     </div>
   );
 }
+
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
